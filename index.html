@@ -43,19 +43,33 @@
             left: 50%;
             top: 0;
             transform: translateX(-50%);
-            pointer-events: none; /* 不影响点击空格 */
+            pointer-events: none; /* 不影响再次点击 */
             color: #e63946; /* 下落文字专属颜色 */
+        }
+
+        /* 手机适配：优化点击区域，添加提示文字 */
+        .touch-hint {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #666;
+            font-size: 16px;
+            pointer-events: none; /* 不遮挡点击 */
         }
     </style>
 </head>
 <body>
     <!-- 原有飘动文字 -->
-    <div class="float-text">漂白水大傻逼</div>
-    <div class="float-text">漂白水大傻逼</div>
-    <div class="float-text">漂白水大傻逼</div>
-    <div class="float-text">漂白水大傻逼</div>
-    <div class="float-text">漂白水大傻逼</div>
-    <div class="float-text">漂白水大傻逼</div>
+    <div class="float-text">漂白水大大大</div>
+    <div class="float-text">漂白水大大大</div>
+    <div class="float-text">漂白水大大大</div>
+    <div class="float-text">漂白水大大大</div>
+    <div class="float-text">漂白水大大大</div>
+    <div class="float-text">漂白水大大大</div>
+
+    <!-- 手机触屏提示 -->
+    <div class="touch-hint">点击屏幕 / 按空格键 生成下落文字</div>
 
     <script>
         // 重力加速度（像素/帧²）
@@ -65,57 +79,69 @@
         // 存储所有下落文字的动画状态
         const fallingTexts = [];
 
-        // 监听空格点击，生成下落文字
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') {
-                const text = document.createElement('div');
-                text.className = 'fall-text';
-                text.textContent = '漂白水大傻逼';
-                document.body.appendChild(text);
+        // 生成下落文字的核心函数
+        function createFallingText() {
+            const text = document.createElement('div');
+            text.className = 'fall-text';
+            text.textContent = '漂白水大大大';
+            document.body.appendChild(text);
 
-                // 初始化文字状态：位置、速度、弹跳系数（无能量损耗=1）
-                fallingTexts.push({
-                    elem: text,
-                    x: window.innerWidth / 2 - text.offsetWidth / 2, // 水平居中
-                    y: 0, // 顶部开始
-                    vx: (Math.random() - 0.5) * 3, // 水平随机初速度（-1.5~1.5）
-                    vy: 0, // 垂直初速度0
-                    bounce: 1 // 弹力系数（无损耗）
-                });
+            // 初始化文字状态：位置、速度、弹跳系数（无能量损耗=1）
+            fallingTexts.push({
+                elem: text,
+                x: window.innerWidth / 2 - text.offsetWidth / 2, // 水平居中
+                y: 0, // 顶部开始
+                vx: (Math.random() - 0.5) * 3, // 水平随机初速度（-1.5~1.5）
+                vy: 0, // 垂直初速度0
+                bounce: 1 // 弹力系数（无损耗）
+            });
+        }
+
+        // 1. 空格触发（电脑）
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !e.repeat) { // 避免长按连续生成
+                createFallingText();
             }
+        });
+
+        // 2. 触屏点击触发（手机/平板）
+        document.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // 阻止默认行为（如页面滚动）
+            createFallingText();
+        }, { passive: false });
+
+        // 3. 鼠标点击触发（补充：电脑也能点击屏幕生成）
+        document.addEventListener('click', () => {
+            createFallingText();
         });
 
         // 动画帧循环，处理重力和弹跳
         function animate() {
-            fallingTexts.forEach((textObj, index) => {
-                const { elem, x, y, vx, vy, bounce } = textObj;
+            fallingTexts.forEach((textObj) => {
+                const { elem } = textObj;
 
                 // 更新速度（重力叠加）
-                const newVy = vy + GRAVITY;
+                textObj.vy += GRAVITY;
                 // 更新位置
-                let newX = x + vx;
-                let newY = y + newVy;
+                textObj.x += textObj.vx;
+                textObj.y += textObj.vy;
 
                 // 碰撞检测：碰到地面反弹
-                if (newY + elem.offsetHeight >= window.innerHeight - GROUND_HEIGHT) {
-                    newY = window.innerHeight - GROUND_HEIGHT - elem.offsetHeight;
-                    textObj.vy = -newVy * bounce; // 反向速度（无损耗）
+                if (textObj.y + elem.offsetHeight >= window.innerHeight - GROUND_HEIGHT) {
+                    textObj.y = window.innerHeight - GROUND_HEIGHT - elem.offsetHeight;
+                    textObj.vy = -textObj.vy * textObj.bounce; // 反向速度（无损耗）
                     textObj.vx *= 0.98; // 水平速度轻微衰减（避免无限滑动）
-                } else {
-                    textObj.vy = newVy;
                 }
 
                 // 水平边界碰撞（左右反弹）
-                if (newX <= 0 || newX + elem.offsetWidth >= window.innerWidth) {
-                    textObj.vx = -vx * bounce;
-                    newX = Math.max(0, Math.min(newX, window.innerWidth - elem.offsetWidth));
+                if (textObj.x <= 0 || textObj.x + elem.offsetWidth >= window.innerWidth) {
+                    textObj.vx = -textObj.vx * textObj.bounce;
+                    textObj.x = Math.max(0, Math.min(textObj.x, window.innerWidth - elem.offsetWidth));
                 }
 
                 // 更新DOM位置
-                textObj.x = newX;
-                textObj.y = newY;
-                elem.style.left = `${newX}px`;
-                elem.style.top = `${newY}px`;
+                elem.style.left = `${textObj.x}px`;
+                elem.style.top = `${textObj.y}px`;
             });
 
             requestAnimationFrame(animate);
